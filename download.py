@@ -1,29 +1,53 @@
-from flask import Flask, request, jsonify, send_from_directory
-import yt_dlp
+from flask import Flask, request, send_file
+from pytube import YouTube
 import os
 
-app = Flask(__name__, static_url_path='')
+app = Flask(__name__)
 
-@app.route('/')
-def serve_html():
-    return send_from_directory(os.getcwd(), 'índice.html')
+# Função para download de vídeo
+def download_video(url, resolution='720p', save_path="downloads"):
+    yt = YouTube(url)
+    stream = yt.streams.filter(res=resolution, file_extension='mp4').first()
+    
+    if not stream:
+        # Se não encontrar o formato solicitado, pega o default
+        stream = yt.streams.get_highest_resolution()
+
+    video_path = os.path.join(save_path, f"{yt.title}.mp4")
+    stream.download(output_path=save_path, filename=f"{yt.title}.mp4")
+    return video_path
+
+# Função para download de áudio
+def download_audio(url, save_path="downloads"):
+    yt = YouTube(url)
+    stream = yt.streams.filter(only_audio=True).first()
+    audio_path = os.path.join(save_path, f"{yt.title}.mp3")
+    stream.download(output_path=save_path, filename=f"{yt.title}.mp3")
+    return audio_path
 
 @app.route('/download', methods=['POST'])
-def download_video():
-    url = request.json.get('url')
-    if not url:
-        return jsonify({'error': 'URL is required'}), 400
+def download():
+    data = request.json
+    url = data.get('url')
+    format = data.get('format')  # MP4 or MP3
+    resolution = data.get('resolution', '720p')  # Default resolution
 
-    ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
-        'outtmpl': 'downloads/%(id)s.%(ext)s',
-    }
+    # Cria a pasta de downloads se não existir
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=False)
-        video_url = info_dict['url']
+    try:
+        # Baixa o vídeo ou áudio
+        if format == 'mp4':
+            video_path = download_video(url, resolution)
+            return send_file(video_path, as_attachment=True)
+        elif format == 'mp3':
+            audio_path = download_audio(url)
+            return send_file(audio_path, as_attachment=True)
+        else:
+            return {'error': 'Formato inválido!'}, 400
+    except Exception as e:
+        return {'error': str(e)}, 500
 
-    return jsonify({'video_url': video_url})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)
