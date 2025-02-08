@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlackEngine - Baixar YouTube</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body { background-color: #222; color: white; font-family: Arial, sans-serif; }
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        iframe {
+            width: 100%;
+            height: 315px;
+            border-radius: 10px;
+            display: none;
+        }
+        .download-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .download-btn {
+            width: 48%;
+        }
+        #formats {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="mb-4 text-warning">Zap Video Go</h1>
+
+        <div class="input-group mb-3">
+            <input type="text" id="video_url" class="form-control" placeholder="Cole o link do vídeo aqui" oninput="updateVideo()">
+        </div>
+
+        <iframe id="video_frame" src="" allowfullscreen></iframe>
+
+        <div class="download-buttons">
+            <button id="mp4_btn" class="btn btn-primary download-btn" onclick="showFormats()">Baixar MP4</button>
+            <button id="mp3_btn" class="btn btn-success download-btn" onclick="downloadMP3()">Baixar MP3</button>
+        </div>
+
+        <div id="formats"></div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function updateVideo() {
+            let url = $("#video_url").val();
+            let videoId = extractVideoID(url);
+            if (videoId) {
+                $("#video_frame").attr("src", "https://www.youtube.com/embed/" + videoId).show();
+                $("#formats").html("");
+            } else {
+                $("#video_frame").hide();
+            }
+        }
+
+        function extractVideoID(url) {
+            let match = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+            return match ? match[1] : null;
+        }
+
+        function showFormats() {
+            let url = $("#video_url").val();
+            if (!url) {
+                alert("Cole um link válido primeiro!");
+                return;
+            }
+
+            $.post("/get_info", {url: url}, function(data) {
+                if (data.error) {
+                    alert("Erro: " + data.error);
+                    return;
+                }
+
+                $("#formats").html("<h5 class='mt-3'>Escolha a qualidade:</h5>");
+
+                data.formats.forEach(f => {
+                    $("#formats").append(`
+                        <button class="btn btn-outline-primary mb-2 w-100" onclick="download('${url}', '${f.format_id}')">
+                            ${f.resolution} (${f.ext}) - ${f.size} MB
+                        </button>
+                    `);
+                });
+            });
+        }
+
+        function download(url, format_id) {
+            $.post("/download", {url: url, format_id: format_id}, function(data) {
+                if (data.download_url) {
+                    window.location.href = "/" + data.download_url;
+                } else {
+                    alert("Erro no download!");
+                }
+            });
+        }
+
+        function downloadMP3() {
+            let url = $("#video_url").val();
+            if (!url) {
+                alert("Cole um link válido primeiro!");
+                return;
+            }
+
+            $.post("/download_mp3", {url: url}, function(data) {
+                if (data.download_url) {
+                    window.location.href = "/" + data.download_url;
+                } else {
+                    alert("Erro ao baixar MP3!");
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
