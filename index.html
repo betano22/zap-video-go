@@ -50,7 +50,7 @@
         <iframe id="video_frame" src="" allowfullscreen></iframe>
 
         <div class="download-buttons">
-            <button id="mp4_btn" class="btn btn-primary download-btn" onclick="showFormats()">Baixar MP4</button>
+            <button id="mp4_btn" class="btn btn-primary download-btn" onclick="showFormats('mp4')">Baixar MP4</button>
             <button id="mp3_btn" class="btn btn-success download-btn" onclick="downloadMP3()">Baixar MP3</button>
         </div>
 
@@ -77,7 +77,7 @@
             return match ? match[1] : null;
         }
 
-        function showFormats() {
+        function showFormats(formatType) {
             let url = $("#video_url").val();
             if (!url) {
                 alert("Cole um link válido primeiro!");
@@ -93,11 +93,13 @@
                 $("#formats").html("<h5 class='mt-3'>Escolha a qualidade:</h5>");
 
                 data.formats.forEach(f => {
-                    $("#formats").append(`
-                        <button class="btn btn-outline-primary mb-2 w-100" onclick="download('${url}', '${f.format_id}')">
-                            ${f.resolution} (${f.ext}) - ${f.size} MB
-                        </button>
-                    `);
+                    if(f.ext === formatType) {  // Condiciona para mostrar apenas o formato selecionado
+                        $("#formats").append(`
+                            <button class="btn btn-outline-primary mb-2 w-100" onclick="download('${url}', '${f.format_id}')">
+                                ${f.resolution} (${f.ext}) - ${f.size} MB
+                            </button>
+                        `);
+                    }
                 });
             });
         }
