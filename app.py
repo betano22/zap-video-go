@@ -1,53 +1,62 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, jsonify
 from pytube import YouTube
 import os
 
 app = Flask(__name__)
 
-# Função para download de vídeo
-def download_video(url, resolution='720p', save_path="downloads"):
+# Função para baixar o vídeo no formato desejado
+def download_video(url, format_type, format_id):
     yt = YouTube(url)
-    stream = yt.streams.filter(res=resolution, file_extension='mp4').first()
-    
-    if not stream:
-        # Se não encontrar o formato solicitado, pega o default
-        stream = yt.streams.get_highest_resolution()
+    if format_type == "mp4":
+        stream = yt.streams.filter(file_extension='mp4').get_by_itag(format_id)
+    elif format_type == "mp3":
+        stream = yt.streams.filter(only_audio=True).get_by_itag(format_id)
+    else:
+        return None
+    return stream.download()
 
-    video_path = os.path.join(save_path, f"{yt.title}.mp4")
-    stream.download(output_path=save_path, filename=f"{yt.title}.mp4")
-    return video_path
-
-# Função para download de áudio
-def download_audio(url, save_path="downloads"):
-    yt = YouTube(url)
-    stream = yt.streams.filter(only_audio=True).first()
-    audio_path = os.path.join(save_path, f"{yt.title}.mp3")
-    stream.download(output_path=save_path, filename=f"{yt.title}.mp3")
-    return audio_path
+@app.route('/get_info', methods=['POST'])
+def get_video_info():
+    video_url = request.form.get('url')
+    try:
+        yt = YouTube(video_url)
+        formats = []
+        for stream in yt.streams.filter(progressive=True, file_extension="mp4"):
+            formats.append({
+                'format_id': stream.itag,
+                'resolution': stream.resolution,
+                'ext': stream.subtype,
+                'size': round(stream.filesize / (1024 * 1024), 2)  # Tamanho em MB
+            })
+        return jsonify({'formats': formats})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 @app.route('/download', methods=['POST'])
-def download():
-    data = request.json
-    url = data.get('url')
-    format = data.get('format')  # MP4 or MP3
-    resolution = data.get('resolution', '720p')  # Default resolution
-
-    # Cria a pasta de downloads se não existir
-    if not os.path.exists('downloads'):
-        os.makedirs('downloads')
-
+def download_video_route():
+    video_url = request.form.get('url')
+    format_id = request.form.get('format_id')
     try:
-        # Baixa o vídeo ou áudio
-        if format == 'mp4':
-            video_path = download_video(url, resolution)
-            return send_file(video_path, as_attachment=True)
-        elif format == 'mp3':
-            audio_path = download_audio(url)
-            return send_file(audio_path, as_attachment=True)
-        else:
-            return {'error': 'Formato inválido!'}, 400
+        yt = YouTube(video_url)
+        stream = yt.streams.get_by_itag(format_id)
+        download_path = stream.download()
+        download_url = os.path.basename(download_path)
+        return jsonify({'download_url': download_url})
     except Exception as e:
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)})
 
-if __name__ == "__main__":
+@app.route('/download_mp3', methods=['POST'])
+def download_mp3_route():
+    video_url = request.form.get('url')
+    try:
+        yt = YouTube(video_url)
+        stream = yt.streams.filter(only_audio=True).first()
+        download_path = stream.download(filename='audio.mp4')
+        os.rename(download_path, download_path.replace('.mp4', '.mp3'))
+        download_url = os.path.basename(download_path.replace('.mp4', '.mp3'))
+        return jsonify({'download_url': download_url})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+if __name__ == '__main__':
     app.run(debug=True)
