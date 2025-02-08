@@ -1,3 +1,8 @@
+import subprocess
+
+# Atualiza a biblioteca PyTube via GitHub
+subprocess.run(['pip', 'install', '--upgrade', 'git+https://github.com/pytube/pytube.git'])
+
 from flask import Flask, request, jsonify
 from pytube import YouTube
 import os
